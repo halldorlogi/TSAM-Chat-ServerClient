@@ -43,6 +43,9 @@ int main(int argc, char *argv[]) {
     ifstream myfile("ports.txt");
     if(myfile.is_open()) {
         while(getline(myfile,line)) {
+    
+            //cout << "Enter port to scan: ";
+            //cin >> portno;
             cout << "Scanning port: " << line << '\n';
             portno = stoi(line);
             
@@ -75,6 +78,7 @@ int main(int argc, char *argv[]) {
             
             // Attempt a connection to the socket.
             connection = connect(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr));
+            
             if (connection == -1) {
                 cout << "Port: " << portno << " CLOSED" << endl;
             }
@@ -106,7 +110,8 @@ int main(int argc, char *argv[]) {
         }
         myfile.close();
         
+        
     }
-    else cout << "unable to open file";
+   else cout << "unable to open file";
     
 }
