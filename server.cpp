@@ -212,7 +212,7 @@ string newID(){
     }
 
     //add the timestamp and group
-    str += "\n" + getReadableTime() + "GROUP 43";
+    str += "\n" + getReadableTime() + "\nGROUP 43";
     idFile.close();
     return str;
 }
