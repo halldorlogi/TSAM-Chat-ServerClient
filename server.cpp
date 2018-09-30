@@ -119,6 +119,7 @@ void openPort(struct sockaddr_in serv_addr, int sockfd, int portno) {
 
 ///manages the knockingClients vector based on information given.
 void vectorManagement(string peerName, int portno, int t){
+	
     //if this is the port, then he is starting the sequence and we add him into the vector.
     if(portno == KNOCK_PORT_1){
         int i = 0;
@@ -129,6 +130,7 @@ void vectorManagement(string peerName, int portno, int t){
         knockingClients[i]->knock1 = true;
         knockingClients[i]->timeOfKnock1 = t;
     }
+	
     //if this is the port, he is attempting to continue the sequence.
     else if(portno == KNOCK_PORT_2){
         for(int i = 0 ; i < (int)knockingClients.size() ; i++){
@@ -142,35 +144,47 @@ void vectorManagement(string peerName, int portno, int t){
 
 ///checks who is knocking on a port, calls vectorManager to store information about who knocks on what port and when
 void checkWhoIsKnocking(struct sockaddr_in &cli_addr, int sockfd, int portno, socklen_t len){
+	
     //accept the connection
     cout << "knock knock " << portno << endl;
     int knockerSock = accept(sockfd, (struct sockaddr *)&cli_addr, &len);
     validateSocket(knockerSock);
+	
     //see who it is
     getpeername(knockerSock, (struct sockaddr * )&cli_addr, &len);
     string peerName = inet_ntoa(cli_addr.sin_addr);
-    cout << peerName << endl;
+	
+	//get the current time
     int t = getTime();
 
     //close the connection
     close(knockerSock);
+	
     vectorManagement(peerName, portno, t);
 }
 
 ///similar to checkWhoIsKnocking but specifically for the listening port. Does not close the socket
 int checkIfThisPeerIsAllowed(struct sockaddr_in &cli_addr, int sockfd, socklen_t len){
+	
     //see who it is
     getpeername(sockfd, (struct sockaddr * )&cli_addr, &len);
     string peerName = inet_ntoa(cli_addr.sin_addr);
+	
+	//get current time
     int t = getTime();
+	
     //if they have knocked on KNOCK_PORT_2 and less than 1200000ms have passed, they get in.
     for(int i = 0 ; i < (int)knockingClients.size() ; i++){
+		
         //find the right client in the vector
         if(knockingClients[i]->peerName == peerName){
+			
             //check the time
             if(knockingClients[i]->knock2 && t - knockingClients[i]->timeOfKnock1 < MAX_TIME_INTERVAL){
+				
                 //save this socket
                 knockingClients[i]->socketVal = sockfd;
+				
                 //add this client to the allowedClients vector and erase him from the knockingClients vector
                 allowedClients.push_back(knockingClients[i]);
                 knockingClients.erase(knockingClients.begin() + i);
@@ -182,7 +196,7 @@ int checkIfThisPeerIsAllowed(struct sockaddr_in &cli_addr, int sockfd, socklen_t
     return 0;
 }
 
-///Generates a new serverID using the fortune command, a timestamp and the initials of this group (HAH)
+///Generates a new serverID using the fortune command, a timestamp and our group number
 string newID(){
     string str;
     string line;
@@ -197,8 +211,8 @@ string newID(){
         str += line;
     }
 
-    //add the timestamp and initials
-    str += "\n" + getReadableTime() + " GROUP 43";
+    //add the timestamp and group
+    str += "\n" + getReadableTime() + "GROUP 43";
     idFile.close();
     return str;
 }
@@ -208,6 +222,7 @@ void sendBufferToAll(ClientInfo* user, char* buffer, bool alsoSendToSender){
     buffer[strlen(buffer)] = '\0';
 
     for(int i = 0 ; i < (int)allowedClients.size() ; i++){
+		
         //check if this user is the sender and whether or not to send the buffer to him
         if((allowedClients[i] !=  user || alsoSendToSender) && allowedClients[i]->hasUsername){
             send(allowedClients[i]->socketVal, buffer, strlen(buffer), 0);
@@ -226,7 +241,7 @@ void leave(ClientInfo* user, char* buffer){
     for(int i = 0 ; i < (int)allowedClients.size() ; i++){
         if(allowedClients[i] == user){
 
-            //once he is found and has a username, the buffer is sent to othe users.
+            //once he is found and has a username, the buffer is sent to other users.
             if(user->hasUsername){
                 sendBufferToAll(user, buffer, 0);
             }
@@ -244,7 +259,9 @@ void handleConnection(char* buffer, int messageCheck, ClientInfo* user) {
     // get the command
     manageBuffer(buffer, command);
 
+	//let the user connect with a desired username as long is he does not already have one
     if (command == "CONNECT" && !user->hasUsername) {
+		
         //set the username
         user->userName = string(buffer);
         user->hasUsername = true;
@@ -271,6 +288,8 @@ void handleConnection(char* buffer, int messageCheck, ClientInfo* user) {
 
     //change the server id
     else if(command == "CHANGE" && user->hasUsername){
+		
+		//this is a 2 word command so we need the next word.
         manageBuffer(buffer, command);
         if(command == "ID"){
             serverID = newID();
@@ -286,6 +305,7 @@ void handleConnection(char* buffer, int messageCheck, ClientInfo* user) {
     //send the user a list of clients who are connected
     else if (command == "WHO" && user->hasUsername) {
         bzero(buffer, strlen(buffer));
+		
         //add users who have a username (and are therefore connected) to the buffer
         for (int i = 0; i < (int)allowedClients.size(); i++) {
             if(allowedClients[i]->hasUsername){
@@ -297,7 +317,6 @@ void handleConnection(char* buffer, int messageCheck, ClientInfo* user) {
                 strcat(buffer, str.c_str());
             }
         }
-
         send(user->socketVal, buffer, strlen(buffer), 0);
     }
 
@@ -316,7 +335,7 @@ void handleConnection(char* buffer, int messageCheck, ClientInfo* user) {
     //sends a message to a specific or all users
     else if(command == "MSG" && user->hasUsername){
 
-        //since MSG is a 2 word command, we need the second word
+        //MSG is a 2 word command, we need the second word
         manageBuffer(buffer, name);
 
         char tempBuffer[strlen(buffer)] ;
@@ -373,7 +392,6 @@ int main(){
     struct sockaddr_in serv_addr, cli_addr;
     socklen_t cli_addrlen;
 
-
     serverID = newID();
 
     //the message buffer
@@ -394,23 +412,24 @@ int main(){
 
     //socket settings
     bzero((char*)&serv_addr, sizeof(serv_addr));
-
     openPort(serv_addr, knockSock1, KNOCK_PORT_1);
     openPort(serv_addr, knockSock2, KNOCK_PORT_2);
     openPort(serv_addr, listeningSock, MAIN_PORT);
-
-    cout << "THE SERVER IS UP AND RUNNING" << endl;
 
     //listen for activity
     listen(knockSock1, 5);
     listen(knockSock2, 5);
     listen(listeningSock, 5);
+	
+	//if we make it to here, the server is up
+    cout << "THE SERVER IS UP AND RUNNING" << endl;
 
     cli_addrlen = sizeof(cli_addr);
 
 
 ///##################### RUNNING BODY OF SERVER ######################
     while(true){
+		
         //clean out knockingClients array of anyone who has not knocked in 2 minutes
         int t = getTime();
 		if(knockingClients.size() > 0){
@@ -423,7 +442,7 @@ int main(){
 			}
         }
 
-        //reset the fd_set
+        //reinitialize the fd_set
         FD_ZERO(&masterFD);
         FD_SET(knockSock1, &masterFD);
         FD_SET(knockSock2, &masterFD);
@@ -458,7 +477,9 @@ int main(){
             newSock = accept(listeningSock, (struct sockaddr *)&cli_addr, (socklen_t *)&cli_addrlen);
             validateSocket(newSock);
             if(checkIfThisPeerIsAllowed(cli_addr, newSock, cli_addrlen) == 1){
-                cout << "sending message" << endl;
+                cout << "letting in new client" << endl;
+				
+				//send instructions to the new client
                 strcpy(message, "Please use the CONNECT command to select your username for the chat server\n");
                 send(newSock, message, strlen(message), 0);
             }
@@ -473,12 +494,15 @@ int main(){
 
             if(FD_ISSET(socketVal, &masterFD)){
                 bzero(message, 1000);
+				
+				//read the message
                 messageCheck = read(socketVal, message, 1000);
                 message[messageCheck] = '\0';
                 if(messageCheck != 0){
                     handleConnection(message, messageCheck, allowedClients[i]);
                 }
 
+				//if messageCheck is 0, the client must have disconnected.
                 else{
                     if(allowedClients[i]->hasUsername){
                         strcpy(message, "User \"");
