@@ -5,113 +5,153 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+
 #include <netdb.h>
 #include <iostream>
 #include <fstream>
 
-
 using namespace std;
 
+// ** ERROR FUNCTION ** //
+void error(const char *msg)
+{
+    perror(msg);
+    exit(0);
+}
 
-/*// An error helper
- void error(const char *msg)
- {
- perror(msg);
- exit(0);
- }*/
+// ** A WRITE FUNCTION ** //
+void sendCommand(char* buffer, int sockfd) {
+
+    cout << "Enter a command: ";
+    bzero(buffer, 1000);
+    fgets(buffer, 1000, stdin);
+    if(write(sockfd, buffer, strlen(buffer)) < 0){
+        cout << "ERROR writing to socket" << endl;
+    }
+}
+
+
+bool knockOnPort(sockaddr_in serv_addr, hostent* server, int portno, int sockfd, const char* addr){
+
+    if (sockfd < 0) {
+        cout << "Error opening socket" << endl;
+    }
+
+    // ** APPLE COMPATIBILITY CODE ** //
+
+    // ** SETTING UP SERVER ** //
+    bzero((char *) &serv_addr, sizeof(serv_addr));
+    serv_addr.sin_family = AF_INET;
+
+    // ** HOST ADDRESS IS STORED IN NETWORK BYTE ORDER ** //
+    bcopy((char *) server->h_addr,
+        (char *) &serv_addr.sin_addr.s_addr,
+        server->h_length);
+
+    serv_addr.sin_port = htons(portno);
+
+
+    // Attempt a connection to the socket.
+    int connection = connect(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr));
+    if (connection == -1) {
+        cout << "Port: " << portno << " CLOSED" << endl;
+        return false;
+    }
+    return true;
+}
+
+bool validateCommand(string input){
+    string firstWord = strtok(&input[0], " ");
+
+    if(firstWord == "CONNECT" || firstWord == "ID" || firstWord == "MSG" || firstWord == "WHO" || firstWord == "LEAVE"){
+        return true;
+    }
+    if(firstWord == "CHANGE"){
+        string str = input.substr(input.find_first_of(" ")+1);
+        firstWord = strtok(&str[0], " ");
+        if(firstWord == "ID"){
+            return true;
+        }
+    }
+    return false;
+}
 
 int main(int argc, char *argv[]) {
-    int sockfd, portno, connection;
-    int n;
+
+    // ** INITIALIZING VARIABLES **//
+    int knock1, knock2, sockfd;
     string address;
     struct sockaddr_in serv_addr;           // Socket address structure
     struct hostent *server;
+    struct timeval time;
     string line;
-    
-    char buffer[256];
-    /*if (argc < 3) {
-     fprintf(stderr,"usage %s hostname port\n", argv[0]);
-     exit(0);
-     }*/
-    
-    //server = gethostbyname(argv[1]);        // Get host from IP
-    //portno = atoi(argv[2]);     // Read Port No from command line
-    
+    char buffer[1000];
+
+    fd_set masterFD, readFD;
+
+    // ** SETTING ADDRESS TO LOCALHOST ** //
     address = "localhost";
     const char *addr = address.c_str();
-    
-    ifstream myfile("ports.txt");
-    if(myfile.is_open()) {
-        while(getline(myfile,line)) {
-    
-            //cout << "Enter port to scan: ";
-            //cin >> portno;
-            cout << "Scanning port: " << line << '\n';
-            portno = stoi(line);
-            
-            server = gethostbyname(addr);
-            
-            if (server == NULL) {
-                fprintf(stderr, "ERROR, no such host\n");
-                exit(0);
-            }
-            
-            sockfd = socket(AF_INET, SOCK_STREAM, 0); // Open Socket
-            
-            if (sockfd < 0) {
-                cout << "Error opening socket" << endl;
-            }
-            
-            int hincl = 1; /* 1 = on, 0 = off */
-            setsockopt(sockfd, IPPROTO_IP, IP_HDRINCL, &hincl, sizeof(hincl));
-            
-            bzero((char *) &serv_addr, sizeof(serv_addr));
-            
-            serv_addr.sin_family = AF_INET; // This is always set to AF_INET
-            
-            // Host address is stored in network byte order
-            bcopy((char *) server->h_addr,
-                  (char *) &serv_addr.sin_addr.s_addr,
-                  server->h_length);
-            
-            serv_addr.sin_port = htons(portno);
-            
-            // Attempt a connection to the socket.
-            connection = connect(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr));
-            
-            if (connection == -1) {
-                cout << "Port: " << portno << " CLOSED" << endl;
-            }
-            
-            if (connection == 0) {
-                cout << "Port: " << portno << " OPEN" << endl;
-                // Read and write to socket
-                printf("Please enter the message: ");
-                bzero(buffer,256);
-                fgets(buffer,255, stdin);
-                n = write(sockfd, buffer, strlen(buffer));
-                
-                if (n < 0) {
-                    
-                    cout << "ERROR writing to socket" << endl;
+
+    server = gethostbyname(addr);
+
+    if (server == NULL) {
+        fprintf(stderr, "ERROR, no such host\n");
+        exit(0);
+    }
+
+    knock1 = socket(AF_INET, SOCK_STREAM, 0); // Open Socket
+    knock2 = socket(AF_INET, SOCK_STREAM, 0); // Open Socket
+    sockfd = socket(AF_INET, SOCK_STREAM, 0); // Open Socket
+
+    if(knockOnPort(serv_addr, server, 33745, knock1, addr)){
+        close(knock1);
+        if(knockOnPort(serv_addr, server, 33746, knock2, addr)){
+            close(knock2);
+            if(knockOnPort(serv_addr, server, 33747, sockfd, addr)){
+
+                cout << sockfd << endl;
+
+                cout << "Here is a list of available commands" << endl << endl;
+                cout << "ID                   ::      Set ID of server" << endl;
+                cout << "CONNECT <USERNAME>   ::      Connect to the server" << endl;
+                cout << "LEAVE                ::      Disconnect from server" << endl;
+                cout << "WHO                  ::      List users on server" << endl;
+                cout << "MSG <USERNAME>       ::      Send private message" << endl;
+                cout << "MSG ALL              ::      Send message to everyone" << endl;
+                cout << "CHANGE ID            ::      Change ID of server" << endl;
+                cout << endl;
+
+                string input;
+                do{
+                    FD_ZERO((&masterFD));
+                    FD_ZERO((&readFD));
+                    FD_SET(sockfd, &masterFD);
+                    FD_SET(STDIN_FILENO, &readFD);
+
+                    time.tv_sec = 1;
+                    select(sockfd + 1, &masterFD, NULL, NULL, &time);
+                    if(FD_ISSET(sockfd, &masterFD)){
+                        bzero(buffer, 1000);
+                            int bytesRecv = recv(sockfd, buffer, 1000, 0);
+                            if(bytesRecv > 0){
+                            cout << string(buffer, 0, bytesRecv) << endl;
+                        }
+                    }
+                    time.tv_sec = 1;
+                    select(STDIN_FILENO + 1, &readFD, NULL, NULL, &time);
+                    if(FD_ISSET(STDIN_FILENO, &readFD)){
+                        getline(cin, input);
+                        if(input.size() > 0 && validateCommand(input)){
+                            send(sockfd, input.c_str(), input.size() + 1, 0);
+                        }
+                        else{
+                            cout << "That's not a valid command" << endl;
+                        }
+                    }
                 }
-                
-                bzero(buffer,256);
-                n = read(sockfd, buffer, 255);
-                
-                if (n <= 0) {
-                    cout << "ERROR reading from socket" << endl;
-                }
-                
-                cout << buffer << endl;
-                close(sockfd);
-                
+                while(input != "LEAVE");
             }
         }
-        myfile.close();
-        
-        
     }
-   else cout << "unable to open file";
-    
 }
