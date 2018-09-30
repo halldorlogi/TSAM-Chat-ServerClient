@@ -6,9 +6,11 @@ Chat server and client
 OS we used to compile:
 Linux Ubuntu 18.04
 
-fortune and g++ compiler needs to be installed. This can be done by running these commands:
-	sudo apt install fortune
-	sudo apt install g++
+fortune and g++ compiler needs to be installed. 
+This can be done by running these commands:
+
+1. sudo apt install fortune
+2. sudo apt install g++
 
 
 Instructions to test/run:
