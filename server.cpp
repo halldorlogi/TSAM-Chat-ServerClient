@@ -93,10 +93,6 @@ void manageBuffer(char* buffer, string &firstWord) {
     firstWord = strtok(buffer, " ");
     str = str.substr(str.find_first_of(" ")+1);
     strcpy(buffer, str.c_str());
-
-    //tests
-   // cout << firstWord << endl;
-   // cout << buffer << endl;
 }
 
 ///opens the given port on the given socket.
@@ -119,9 +115,6 @@ void openPort(struct sockaddr_in serv_addr, int sockfd, int portno) {
         cerr << "Error on binding" << endl;
         exit(0);
     }
-
-    cout << "ip is " << inet_ntoa(serv_addr.sin_addr) << endl;
-    cout << "port is" << serv_addr.sin_port << endl;
 }
 
 ///manages the knockingClients vector based on information given.
@@ -129,7 +122,7 @@ void vectorManagement(string peerName, int portno, int t){
     //if this is the port, then he is starting the sequence and we add him into the vector.
     if(portno == KNOCK_PORT_1){
         int i = 0;
-        if(knockingClients.size() > 0){
+        if(!knockingClients.empty()){
             i = (int)knockingClients.size() - 1;
         }
         knockingClients.push_back(new ClientInfo(peerName));
@@ -182,8 +175,6 @@ int checkIfThisPeerIsAllowed(struct sockaddr_in &cli_addr, int sockfd, socklen_t
                 allowedClients.push_back(knockingClients[i]);
                 knockingClients.erase(knockingClients.begin() + i);
 
-                //test
-                //cout << allowedClients[0]->peerName << endl;
                 return 1;
             }
         }
@@ -207,7 +198,7 @@ string newID(){
     }
 
     //add the timestamp and initials
-    str += "\n" + getReadableTime() + "\nHAH";
+    str += "\n" + getReadableTime() + " GROUP 43";
     idFile.close();
     return str;
 }
@@ -219,9 +210,6 @@ void sendBufferToAll(ClientInfo* user, char* buffer, bool alsoSendToSender){
     for(int i = 0 ; i < (int)allowedClients.size() ; i++){
         //check if this user is the sender and whether or not to send the buffer to him
         if((allowedClients[i] !=  user || alsoSendToSender) && allowedClients[i]->hasUsername){
-            //test
-            //cout << "sending \"" << buffer << "\" to " << user->userName << endl;
-
             send(allowedClients[i]->socketVal, buffer, strlen(buffer), 0);
         }
     }
@@ -387,7 +375,6 @@ int main(){
 
 
     serverID = newID();
-    cout << serverID << endl;
 
     //the message buffer
     char message[1000];
@@ -411,6 +398,8 @@ int main(){
     openPort(serv_addr, knockSock1, KNOCK_PORT_1);
     openPort(serv_addr, knockSock2, KNOCK_PORT_2);
     openPort(serv_addr, listeningSock, MAIN_PORT);
+
+    cout << "THE SERVER IS UP AND RUNNING" << endl;
 
     //listen for activity
     listen(knockSock1, 5);
